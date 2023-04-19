@@ -7,23 +7,25 @@ import time
 
 
 class OpenAI:
-    api_key = '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'
-    prompt = '提取下面文字中的食品配料表，并分析每种配料对人体是否健康，并给出食用建议: {}'
+    api_key = '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'
+    prompt = '提取下面文字中的食品配料表，并分析每种配料对人体是否健康，并给出食用建议，少于 100 个字: {}'
 
     def __init__(self):
         openai.api_key = OpenAI.api_key
 
     def ask(self, ingredients: str) -> str:
+        print('open ai ask: {}'.format(ingredients))
         response = openai.Completion.create(
             engine='text-davinci-003',
             prompt=OpenAI.prompt.format(ingredients),
-            max_tokens=4096,
+            max_tokens=3000,
             n=1,
             stop=None,
             temperature=0.3).choices
         result = ''
         for item in response:
             result += item.text
+        print('open ai result: {}'.format(result))
         return result
 
 
@@ -55,10 +57,10 @@ class WxMini:
                 return self.__get_token()
             else:
                 self.count_http_retry = 0
-                return 1, str(e.message), ''
+                return 1, str(e), ''
         except exceptions.HTTPError as e:
             self.count_http_retry = 0
-            return 2, str(e.message), ''
+            return 2, str(e), ''
         else:
             self.count_http_retry = 0
             result = response.json()
@@ -70,7 +72,7 @@ class WxMini:
         self.__get_token()
         wx_url = WxMini.ocr_url.format(self.access_token, img_url)
         try:
-            response = requests.post(wx_url, timeout=1)
+            response = requests.post(wx_url)
             response.raise_for_status()
         except exceptions.Timeout as e:
             self.count_http_retry += 1
@@ -78,15 +80,15 @@ class WxMini:
                 return self.get_ocr(img_url)
             else:
                 self.count_http_retry = 0
-                return 1, str(e.message), ''
+                return 1, str(e), ''
         except exceptions.HTTPError as e:
             self.count_http_retry = 0
-            return 2, str(e.message), ''
+            return 2, str(e), ''
         else:
             self.count_http_retry = 0
             result = response.json()
             if result['errcode'] != 0:
-                return 3, 'wx errcode: ' + result['errcode'] + ', wx errmsg: ' + result['errmsg'], ''
+                return 3, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'], result['errmsg']), ''
 
             ocr_result = ''
             items = result['items']
@@ -105,6 +107,8 @@ gpt = OpenAI()
 @app.route('/upload', methods=['POST'])
 def upload():
     # todo: 图片指纹库
+    # todo: 整体的 try catch
+    # todo: 接入日志
     if 'img' not in request.files:
         return jsonify({'errcode': 1, 'errmsg': 'No img uploaded'})
 
@@ -117,18 +121,18 @@ def upload():
         os.makedirs(UPLOAD_FOLDER)
 
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    os.file.save(file_path)
+    file.save(file_path)
     img_url = 'https://newtype.top/images/' + file.filename
 
     ocr_result = wx.get_ocr(img_url)
     os.remove(file_path)
 
     ocr = ocr_result[2]
-    if ocr_result[0] != 0 or not ocr or ocr.isspace():
-        return jsonify({'errcode': ocr_result[0], 'errmsg': ocr_result[1], 'data': jsonify({'ocr': ocr_result[2]})})
+    if (ocr_result[0] != 0) or (not ocr) or (len(ocr) <= 0):
+        return jsonify({'errcode': ocr_result[0], 'errmsg': ocr_result[1]})
 
     result = gpt.ask(ocr)
-    return jsonify({'errcode': 0, 'errmsg': '', 'data': jsonify({'ocr': result})})
+    return jsonify({'errcode': 0, 'errmsg': 'success', 'ocr': result})
 
 
 if __name__ == '__main__':
