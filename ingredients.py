@@ -38,7 +38,7 @@ class OpenAI:
 
     def ask(self, ingredients: str):
         try:
-            app.logger.info('OpenAI.ask: {}'.format(ingredients))
+            app.logger.info('OpenAI.ask...: {}'.format(ingredients))
             response = openai.Completion.create(
                 engine='text-davinci-003',
                 prompt=OpenAI.prompt.format(ingredients),
@@ -109,7 +109,7 @@ class WxMini:
         self.count_http_retry = 0
 
     def __get_token(self):
-        app.logger.info('WxMini.get_token')
+        app.logger.info('WxMini.get_token...')
         now = time.time()
         if now < self.access_token_expires_timestamp_s:
             app.logger.info('WxMini.get_token not expired')
@@ -141,7 +141,7 @@ class WxMini:
             return 0, '', self.access_token
 
     def get_ocr(self, img_url):
-        app.logger.info('WxMini.get_ocr')
+        app.logger.info('WxMini.get_ocr...')
         self.__get_token()
         wx_url = WxMini.ocr_url.format(self.access_token, img_url)
         try:
@@ -183,8 +183,9 @@ gpt = OpenAI()
 @app.route('/upload', methods=['POST'])
 def upload():
     # todo: 图片指纹库
-    # todo: 接入日志
+    # todo: 接入告警
     try:
+        app.logger.info('/upload...')
         if 'img' not in request.files:
             app.logger.error('/upload: 400, No img uploaded')
             return jsonify({'errcode': 1, 'errmsg': 'No img uploaded'}), 400
@@ -200,6 +201,7 @@ def upload():
 
         file_path = os.path.join(UPLOAD_FOLDER, file.filename)
         file.save(file_path)
+        app.logger.info('/upload save file success.')
         img_url = 'https://newtype.top/images/' + file.filename
 
         ocr_result = wx.get_ocr(img_url)
