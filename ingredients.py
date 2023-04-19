@@ -5,6 +5,21 @@ import os
 import openai
 import time
 import asyncio
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+
+app = Flask(__name__)
+
+log_dir = os.path.join(app.root_path, 'logs')
+if not os.path.exists(log_dir):
+    os.mkdir(log_dir)
+
+log_file = os.path.join(log_dir, 'app.log')
+handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7, encoding='utf-8')
+handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+handler.setLevel(logging.INFO)
+app.logger.addHandler(handler)
 
 
 async def delayed_response(interval):
@@ -23,6 +38,7 @@ class OpenAI:
 
     def ask(self, ingredients: str):
         try:
+            app.logger.info('OpenAI.ask: {}'.format(ingredients))
             response = openai.Completion.create(
                 engine='text-davinci-003',
                 prompt=OpenAI.prompt.format(ingredients),
@@ -31,9 +47,11 @@ class OpenAI:
                 stop=None,
                 temperature=0.3).choices
         except openai.error.APIError as e:
+            app.logger.error('OpenAI.ask.APIError: {}'.format(e))
             self.count_retry = 0
             return 1, 'openai.error.APIError', ''
         except openai.error.Timeout as e:
+            app.logger.error('OpenAI.ask.Timeout: {}'.format(e))
             self.count_retry += 1
             if self.count_retry < OpenAI.max_retry_count:
                 asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
@@ -41,9 +59,11 @@ class OpenAI:
             self.count_retry = 0
             return 2, 'openai.error.Timeout', ''
         except openai.error.RateLimitError as e:
+            app.logger.error('OpenAI.ask.RateLimitError: {}'.format(e))
             self.count_retry = 0
             return 3, 'openai.error.RateLimitError', ''
         except openai.error.APIConnectionError as e:
+            app.logger.error('OpenAI.ask.APIConnectionError: {}'.format(e))
             self.count_retry += 1
             if self.count_retry < OpenAI.max_retry_count:
                 asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
@@ -51,13 +71,15 @@ class OpenAI:
             self.count_retry = 0
             return 4, 'openai.error.APIConnectionError', ''
         except openai.error.InvalidRequestError as e:
-            # todo: log e.message
+            app.logger.error('OpenAI.ask.InvalidRequestError: {}'.format(e))
             self.count_retry = 0
             return 5, 'openai.error.InvalidRequestError', ''
         except openai.error.AuthenticationError as e:
+            app.logger.error('OpenAI.ask.AuthenticationError: {}'.format(e))
             self.count_retry = 0
             return 6, 'openai.error.AuthenticationError', ''
         except openai.error.ServiceUnavailableError as e:
+            app.logger.error('OpenAI.ask.ServiceUnavailableError: {}'.format(e))
             self.count_retry += 1
             if self.count_retry < OpenAI.max_retry_count:
                 asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
@@ -87,15 +109,19 @@ class WxMini:
         self.count_http_retry = 0
 
     def __get_token(self):
+        app.logger.info('WxMini.get_token')
         now = time.time()
         if now < self.access_token_expires_timestamp_s:
+            app.logger.info('WxMini.get_token not expired')
             self.count_http_retry = 0
             return 0, '', self.access_token
 
         try:
+            app.logger.info('WxMini.get_token request')
             response = requests.get(self.token_url, timeout=1)
             response.raise_for_status()
         except exceptions.Timeout as e:
+            app.logger.error('WxMini.get_token.Timeout: {}'.format(e))
             self.count_http_retry += 1
             if self.count_http_retry < WxMini.max_retry_count:
                 asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
@@ -104,6 +130,7 @@ class WxMini:
                 self.count_http_retry = 0
                 return 1, str(e), ''
         except exceptions.HTTPError as e:
+            app.logger.error('WxMini.get_token.HTTPError: {}'.format(e))
             self.count_http_retry = 0
             return 2, str(e), ''
         else:
@@ -114,12 +141,14 @@ class WxMini:
             return 0, '', self.access_token
 
     def get_ocr(self, img_url):
+        app.logger.info('WxMini.get_ocr')
         self.__get_token()
         wx_url = WxMini.ocr_url.format(self.access_token, img_url)
         try:
             response = requests.post(wx_url)
             response.raise_for_status()
         except exceptions.Timeout as e:
+            app.logger.error('WxMini.get_ocr.Timeout: {}'.format(e))
             self.count_http_retry += 1
             if self.count_http_retry < WxMini.max_retry_count:
                 asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
@@ -128,12 +157,14 @@ class WxMini:
                 self.count_http_retry = 0
                 return 1, str(e), ''
         except exceptions.HTTPError as e:
+            app.logger.error('WxMini.get_ocr.HTTPError: {}'.format(e))
             self.count_http_retry = 0
             return 2, str(e), ''
         else:
             self.count_http_retry = 0
             result = response.json()
             if result['errcode'] != 0:
+                app.logger.error('WxMini.get_ocr.APIError: {}'.format(result))
                 return 3, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'], result['errmsg']), ''
 
             ocr_result = ''
@@ -145,7 +176,6 @@ class WxMini:
 
 
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
-app = Flask(__name__)
 wx = WxMini()
 gpt = OpenAI()
 
@@ -156,11 +186,13 @@ def upload():
     # todo: 接入日志
     try:
         if 'img' not in request.files:
+            app.logger.error('/upload: 400, No img uploaded')
             return jsonify({'errcode': 1, 'errmsg': 'No img uploaded'}), 400
 
         file = request.files['img']
 
         if file.filename == '':
+            app.logger.error('/upload: 400, No img selected')
             return jsonify({'errcode': 2, 'errmsg': 'No img selected'}), 400
 
         if not os.path.exists(UPLOAD_FOLDER):
@@ -175,15 +207,19 @@ def upload():
 
         ocr = ocr_result[2]
         if (ocr_result[0] != 0) or (not ocr) or (len(ocr) <= 0):
+            app.logger.error('/upload: 500, WxMini.get_ocr errcode: {}, errmsg: {}'.format(ocr_result[0], ocr_result[1]))
             return jsonify({'errcode': ocr_result[0], 'errmsg': ocr_result[1]}), 500
 
         gpt_result = gpt.ask(ocr)
         conclusion = gpt_result[2]
         if (gpt_result[0] != 0) or (not conclusion) or (len(conclusion) <= 0):
+            app.logger.error('/upload: 500, OpenAI.ask errcode: {}, errmsg: {}'.format(gpt_result[0], gpt_result[1]))
             return jsonify({'errcode': gpt_result[0], 'errmsg': gpt_result[1]}), 500
 
+        app.logger.info('/upload: 200, conclusion: {}'.format(conclusion))
         return jsonify({'errcode': 0, 'errmsg': 'success', 'ocr': conclusion})
     except exceptions as e:
+        app.logger.error('/upload: 500, errors not caught: {}'.format(e))
         return jsonify({'errcode': 1, 'errmsg': 'errors not caught'}), 500
 
 
