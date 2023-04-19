@@ -4,6 +4,11 @@ from requests import exceptions
 import os
 import openai
 import time
+import asyncio
+
+
+async def delayed_response(interval):
+    await asyncio.sleep(interval)
 
 
 class OpenAI:
@@ -26,28 +31,44 @@ class OpenAI:
                 stop=None,
                 temperature=0.3).choices
         except openai.error.APIError as e:
+            self.count_retry = 0
             return 1, 'openai.error.APIError', ''
-            pass
         except openai.error.Timeout as e:
-            # todo: retry request after a brief wait
+            self.count_retry += 1
+            if self.count_retry < OpenAI.max_retry_count:
+                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
+                return self.ask(ingredients)
+            self.count_retry = 0
             return 2, 'openai.error.Timeout', ''
         except openai.error.RateLimitError as e:
+            self.count_retry = 0
             return 3, 'openai.error.RateLimitError', ''
         except openai.error.APIConnectionError as e:
-            # todo: retry request after a brief wait
+            self.count_retry += 1
+            if self.count_retry < OpenAI.max_retry_count:
+                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
+                return self.ask(ingredients)
+            self.count_retry = 0
             return 4, 'openai.error.APIConnectionError', ''
         except openai.error.InvalidRequestError as e:
             # todo: log e.message
+            self.count_retry = 0
             return 5, 'openai.error.InvalidRequestError', ''
         except openai.error.AuthenticationError as e:
+            self.count_retry = 0
             return 6, 'openai.error.AuthenticationError', ''
         except openai.error.ServiceUnavailableError as e:
-            # todo: retry request after a brief wait
+            self.count_retry += 1
+            if self.count_retry < OpenAI.max_retry_count:
+                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
+                return self.ask(ingredients)
+            self.count_retry = 0
             return 7, 'openai.error.ServiceUnavailableError', ''
         else:
             result = ''
             for item in response:
                 result += item.text
+            self.count_retry = 0
             return 0, 'success', result
 
 
@@ -57,8 +78,7 @@ class WxMini:
     token_url = 'https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=' + \
                 app_id + '&secret=' + app_secret
     ocr_url = 'https://api.weixin.qq.com/cv/ocr/comm?access_token={}&img_url={}'
-    max_http_retry = 3            # todo: retry request after a brief wait
-    max_ocr_retry = 2            # todo: retry request after a brief wait
+    max_retry_count = 2
     retry_interval_s = 0.3
 
     def __init__(self):
@@ -69,6 +89,7 @@ class WxMini:
     def __get_token(self):
         now = time.time()
         if now < self.access_token_expires_timestamp_s:
+            self.count_http_retry = 0
             return 0, '', self.access_token
 
         try:
@@ -76,7 +97,8 @@ class WxMini:
             response.raise_for_status()
         except exceptions.Timeout as e:
             self.count_http_retry += 1
-            if self.count_http_retry <= WxMini.max_http_retry:
+            if self.count_http_retry < WxMini.max_retry_count:
+                asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
                 return self.__get_token()
             else:
                 self.count_http_retry = 0
@@ -99,7 +121,8 @@ class WxMini:
             response.raise_for_status()
         except exceptions.Timeout as e:
             self.count_http_retry += 1
-            if self.count_http_retry <= WxMini.max_ocr_retry:
+            if self.count_http_retry < WxMini.max_retry_count:
+                asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
                 return self.get_ocr(img_url)
             else:
                 self.count_http_retry = 0
