@@ -6,7 +6,6 @@ from IngError import IngError
 from OpenAI import OpenAI
 from WxMini import WxMini
 
-
 app = Flask(__name__)
 
 log_dir = os.path.join(app.root_path, 'logs')
@@ -19,10 +18,35 @@ handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
 handler.setLevel(logging.INFO)
 app.logger.addHandler(handler)
 
-
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
 wx = WxMini(app)
 gpt = OpenAI(app)
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    app.logger.info('/api/login...')
+    try:
+        data = request.get_json()
+        code = data.get('code')
+        ing_key = data.get('key')
+        app.logger.info('/api/login: code: {}, key: {}'.format(code, ing_key))
+        if code and ing_key:
+            errcode, errmsg, result = wx.login(code, ing_key)
+            if (errcode != 0) or (not result) or (len(result) <= 0):
+                app.logger.error(
+                    '/api/login: 500, WxMini.login errcode: {}, errmsg: {}'.format(errcode, errmsg))
+                return jsonify({'errcode': errcode, 'errmsg': errmsg}), 500
+
+            app.logger.info('/api/login: 200, ing_key: {}'.format(result))
+            return jsonify({'errcode': 0, 'errmsg': 'success', 'ing_key': result})
+
+        app.logger.error('/api/login: code: {}, key: {}'.format(code, ing_key))
+        return jsonify({'errcode': IngError.WXLoginRequestParameterError.value,
+                        'errmsg': '/api/login: code: {}, key: {}'.format(code, ing_key)}), 500
+    except Exception as e:
+        app.logger.error('/api/login: 500, errors not caught: {}'.format(e))
+        return jsonify({'errcode': IngError.LoginOtherError.value, 'errmsg': 'errors not caught'}), 500
 
 
 @app.route('/upload', methods=['POST'])
@@ -69,7 +93,7 @@ def upload():
         return jsonify({'errcode': 0, 'errmsg': 'success', 'ocr': conclusion})
     except Exception as e:
         app.logger.error('/upload: 500, errors not caught: {}'.format(e))
-        return jsonify({'errcode': 100, 'errmsg': 'errors not caught'}), 500
+        return jsonify({'errcode': IngError.UploadOtherError.value, 'errmsg': 'errors not caught'}), 500
 
 
 if __name__ == '__main__':

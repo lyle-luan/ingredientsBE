@@ -15,6 +15,8 @@ class WxMini:
     token_url = 'https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=' + \
                 app_id + '&secret=' + app_secret
     ocr_url = 'https://api.weixin.qq.com/cv/ocr/comm?access_token={}&img_url={}'
+    login_url = 'https://api.weixin.qq.com/sns/jscode2session?appid={}&secret={}&js_code={' \
+                '}&grant_type=authorization_code '
     max_retry_count = 2
     retry_interval_s = 0.3
 
@@ -55,6 +57,47 @@ class WxMini:
             self.access_token = result['access_token']
             self.access_token_expires_timestamp_s = now + result['expires_in']
             return 0, '', self.access_token
+
+    # ing_key: WX 文档里所说的"自定义用户态"
+    def login(self, js_code, ing_key):
+        self.app.logger.info('WxMini.login...: js_code: {}'.format(js_code))
+        login_url = WxMini.login_url.format(WxMini.app_id, WxMini.app_secret, js_code)
+        try:
+            response = requests.get(login_url)
+            response.raise_for_status()
+        except exceptions.Timeout as e:
+            self.app.logger.error('WxMini.login.Timeout: {}'.format(e))
+            self.count_http_retry += 1
+            if self.count_http_retry < WxMini.max_retry_count:
+                asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
+                return self.login(js_code)
+            else:
+                self.count_http_retry = 0
+                return IngError.WXLoginTimeout.value, str(e), ''
+        except exceptions.HTTPError as e:
+            self.app.logger.error('WxMini.login.HTTPError: {}'.format(e))
+            self.count_http_retry = 0
+            return IngError.WXLoginHTTPError.value, str(e), ''
+        else:
+            self.count_http_retry = 0
+            result = response.json()
+            if result['errcode'] != 0:
+                self.app.logger.error('WxMini.login.APIError: {}'.format(result))
+                return IngError.WXLoginAPIError.value, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'],
+                                                                                              result['errmsg']), ''
+
+            user_openid = result['openid']
+            user_session_key = result['session_key']
+            user_unionid = result['unionid']
+            # todo: 保存到数据库, js_code 是临时的
+            # if NOT ing_key，数据库更新下数据，否则 insert
+            self.app.logger.info(
+                'User: {} logined, openid: {}, session_key: {}, unionid: {}, last_ingKey: {}'.format(js_code,
+                                                                                                     user_openid,
+                                                                                                     user_session_key,
+                                                                                                     user_unionid,
+                                                                                                     ing_key))
+            return 0, '', 'IUEIROJF&234234'  # ing_key
 
     def get_ocr(self, img_url):
         self.app.logger.info('WxMini.get_ocr...')

@@ -16,3 +16,9 @@ class IngError(Enum):
     WXOcrTimeout = 12
     WXOcrHTTPError = 13
     WXOcrAPIError = 14
+    WXLoginTimeout = 12
+    WXLoginHTTPError = 13
+    WXLoginAPIError = 14
+    WXLoginRequestParameterError = 15
+    UploadOtherError = 100
+    LoginOtherError = 200
