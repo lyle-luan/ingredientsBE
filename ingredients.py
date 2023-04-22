@@ -1,30 +1,10 @@
 from flask import Flask, request, jsonify
-import requests
-from requests import exceptions
 import os
-import openai
-import time
-import asyncio
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from enum import Enum, unique
-
-
-class IngError(Enum):
-    UploadNoImg = 1
-    UploadImgNoName = 2
-    OpenAIAPIError = 3
-    OpenAITimeout = 4
-    OpenAIRateLimitError = 5
-    OpenAIAPIConnectionError = 6
-    OpenAIInvalidRequestError = 7
-    OpenAIAuthenticationError = 8
-    OpenAIServiceUnavailableError = 9
-    WXTokenTimeout = 10
-    WXTokenHTTPError = 11
-    WXOcrTimeout = 12
-    WXOcrHTTPError = 13
-    WXOcrAPIError = 14
+from IngError import IngError
+from OpenAI import OpenAI
+from WxMini import WxMini
 
 
 app = Flask(__name__)
@@ -40,172 +20,16 @@ handler.setLevel(logging.INFO)
 app.logger.addHandler(handler)
 
 
-async def delayed_response(interval):
-    await asyncio.sleep(interval)
-
-
-class OpenAI:
-    api_key = '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'
-    prompt = '提取下面文字中的食品配料表，并分析每种配料对人体是否健康，并给出食用建议，少于 100 个字: {}'
-    max_retry_count = 2
-    retry_interval_s = 0.3
-
-    def __init__(self):
-        openai.api_key = OpenAI.api_key
-        self.count_retry = 0
-
-    def ask(self, ingredients: str):
-        try:
-            app.logger.info('OpenAI.ask...: {}'.format(ingredients))
-            response = openai.Completion.create(
-                engine='text-davinci-003',
-                prompt=OpenAI.prompt.format(ingredients),
-                max_tokens=3000,
-                n=1,
-                stop=None,
-                temperature=0.3).choices
-        except openai.error.APIError as e:
-            app.logger.error('OpenAI.ask.APIError: {}'.format(e))
-            self.count_retry = 0
-            return IngError.OpenAIAPIError.value, 'openai.error.APIError', ''
-        except openai.error.Timeout as e:
-            app.logger.error('OpenAI.ask.Timeout: {}'.format(e))
-            self.count_retry += 1
-            if self.count_retry < OpenAI.max_retry_count:
-                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
-                return self.ask(ingredients)
-            self.count_retry = 0
-            return IngError.OpenAITimeout.value, 'openai.error.Timeout', ''
-        except openai.error.RateLimitError as e:
-            app.logger.error('OpenAI.ask.RateLimitError: {}'.format(e))
-            self.count_retry += 1
-            if self.count_retry < OpenAI.max_retry_count:
-                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
-                return self.ask(ingredients)
-            self.count_retry = 0
-            return IngError.OpenAIRateLimitError.value, 'openai.error.RateLimitError', ''
-        except openai.error.APIConnectionError as e:
-            app.logger.error('OpenAI.ask.APIConnectionError: {}'.format(e))
-            self.count_retry += 1
-            if self.count_retry < OpenAI.max_retry_count:
-                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
-                return self.ask(ingredients)
-            self.count_retry = 0
-            return IngError.OpenAIAPIConnectionError.value, 'openai.error.APIConnectionError', ''
-        except openai.error.InvalidRequestError as e:
-            app.logger.error('OpenAI.ask.InvalidRequestError: {}'.format(e))
-            self.count_retry = 0
-            return IngError.OpenAIInvalidRequestError.value, 'openai.error.InvalidRequestError', ''
-        except openai.error.AuthenticationError as e:
-            app.logger.error('OpenAI.ask.AuthenticationError: {}'.format(e))
-            self.count_retry = 0
-            return IngError.OpenAIAuthenticationError.value, 'openai.error.AuthenticationError', ''
-        except openai.error.ServiceUnavailableError as e:
-            app.logger.error('OpenAI.ask.ServiceUnavailableError: {}'.format(e))
-            self.count_retry += 1
-            if self.count_retry < OpenAI.max_retry_count:
-                asyncio.get_event_loop().run_until_complete(delayed_response(OpenAI.retry_interval_s))
-                return self.ask(ingredients)
-            self.count_retry = 0
-            return IngError.OpenAIServiceUnavailableError.value, 'openai.error.ServiceUnavailableError', ''
-        else:
-            result = ''
-            for item in response:
-                result += item.text
-            self.count_retry = 0
-            return 0, 'success', result
-
-
-class WxMini:
-    app_id = 'wx4226b6f08dfba65a'
-    app_secret = '67d2ef55944c47c92010300014b711f4'
-    token_url = 'https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=' + \
-                app_id + '&secret=' + app_secret
-    ocr_url = 'https://api.weixin.qq.com/cv/ocr/comm?access_token={}&img_url={}'
-    max_retry_count = 2
-    retry_interval_s = 0.3
-
-    def __init__(self):
-        self.access_token = ''
-        self.access_token_expires_timestamp_s = time.time()
-        self.count_http_retry = 0
-
-    def __get_token(self):
-        app.logger.info('WxMini.get_token...')
-        now = time.time()
-        if now < self.access_token_expires_timestamp_s:
-            app.logger.info('WxMini.get_token not expired')
-            self.count_http_retry = 0
-            return 0, '', self.access_token
-
-        try:
-            app.logger.info('WxMini.get_token request')
-            response = requests.get(self.token_url, timeout=1)
-            response.raise_for_status()
-        except exceptions.Timeout as e:
-            app.logger.error('WxMini.get_token.Timeout: {}'.format(e))
-            self.count_http_retry += 1
-            if self.count_http_retry < WxMini.max_retry_count:
-                asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
-                return self.__get_token()
-            else:
-                self.count_http_retry = 0
-                return IngError.WXTokenTimeout.value, str(e), ''
-        except exceptions.HTTPError as e:
-            app.logger.error('WxMini.get_token.HTTPError: {}'.format(e))
-            self.count_http_retry = 0
-            return IngError.WXTokenHTTPError.value, str(e), ''
-        else:
-            self.count_http_retry = 0
-            result = response.json()
-            self.access_token = result['access_token']
-            self.access_token_expires_timestamp_s = now + result['expires_in']
-            return 0, '', self.access_token
-
-    def get_ocr(self, img_url):
-        app.logger.info('WxMini.get_ocr...')
-        self.__get_token()
-        wx_url = WxMini.ocr_url.format(self.access_token, img_url)
-        try:
-            response = requests.post(wx_url)
-            response.raise_for_status()
-        except exceptions.Timeout as e:
-            app.logger.error('WxMini.get_ocr.Timeout: {}'.format(e))
-            self.count_http_retry += 1
-            if self.count_http_retry < WxMini.max_retry_count:
-                asyncio.get_event_loop().run_until_complete(delayed_response(WxMini.retry_interval_s))
-                return self.get_ocr(img_url)
-            else:
-                self.count_http_retry = 0
-                return IngError.WXOcrTimeout.value, str(e), ''
-        except exceptions.HTTPError as e:
-            app.logger.error('WxMini.get_ocr.HTTPError: {}'.format(e))
-            self.count_http_retry = 0
-            return IngError.WXOcrHTTPError.value, str(e), ''
-        else:
-            self.count_http_retry = 0
-            result = response.json()
-            if result['errcode'] != 0:
-                app.logger.error('WxMini.get_ocr.APIError: {}'.format(result))
-                return IngError.WXOcrAPIError.value, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'], result['errmsg']), ''
-
-            ocr_result = ''
-            items = result['items']
-            for item in items:
-                ocr_result += item['text'] + ' '
-
-            return 0, '', ocr_result
-
-
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
-wx = WxMini()
-gpt = OpenAI()
+wx = WxMini(app)
+gpt = OpenAI(app)
 
 
 @app.route('/upload', methods=['POST'])
 def upload():
     # todo: 图片指纹库
     # todo: 接入告警
+    # todo: 历史记录，图片不删除，并制作 thumb; 历史记录暂时不做
     try:
         app.logger.info('/upload...')
         if 'img' not in request.files:
