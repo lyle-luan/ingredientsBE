@@ -60,9 +60,9 @@ class WxMini:
 
     # ing_key: WX 文档里所说的"自定义用户态"
     def login(self, js_code, ing_key):
-        self.app.logger.info('WxMini.login...: js_code: {}'.format(js_code))
-        login_url = WxMini.login_url.format(WxMini.app_id, WxMini.app_secret, js_code)
         try:
+            self.app.logger.info('WxMini.login...: js_code: {}, ing_key: {}'.format(js_code, ing_key))
+            login_url = WxMini.login_url.format(WxMini.app_id, WxMini.app_secret, js_code)
             response = requests.get(login_url)
             response.raise_for_status()
         except exceptions.Timeout as e:
