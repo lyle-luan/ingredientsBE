@@ -16,7 +16,7 @@ class WxMini:
                 app_id + '&secret=' + app_secret
     ocr_url = 'https://api.weixin.qq.com/cv/ocr/comm?access_token={}&img_url={}'
     login_url = 'https://api.weixin.qq.com/sns/jscode2session?appid={}&secret={}&js_code={' \
-                '}&grant_type=authorization_code '
+                '}&grant_type=authorization_code'
     max_retry_count = 2
     retry_interval_s = 0.3
 
@@ -67,6 +67,7 @@ class WxMini:
         try:
             self.app.logger.info('WxMini.login...: js_code: {}, ing_key: {}'.format(js_code, ing_key))
             login_url = WxMini.login_url.format(WxMini.app_id, WxMini.app_secret, js_code)
+            self.app.logger.info('WxMini.login...: url: {}'.format(login_url))
             response = requests.get(login_url)
             response.raise_for_status()
         except exceptions.Timeout as e:
@@ -89,6 +90,7 @@ class WxMini:
         else:
             self.count_http_retry = 0
             result = response.json()
+            self.app.logger.info('WxMini.login.result: {}'.format(result))
             if result['errcode'] != 0:
                 self.app.logger.error('WxMini.login.APIError: {}'.format(result))
                 return IngError.WXLoginAPIError.value, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'],
