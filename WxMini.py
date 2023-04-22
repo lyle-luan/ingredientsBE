@@ -51,6 +51,10 @@ class WxMini:
             self.app.logger.error('WxMini.get_token.HTTPError: {}'.format(e))
             self.count_http_retry = 0
             return IngError.WXTokenHTTPError.value, str(e), ''
+        except Exception as e:
+            self.app.logger.error('WxMini.get_token.OtherException: {}'.format(e))
+            self.count_http_retry = 0
+            return IngError.WXTokenOtherError.value, str(e), ''
         else:
             self.count_http_retry = 0
             result = response.json()
@@ -78,6 +82,10 @@ class WxMini:
             self.app.logger.error('WxMini.login.HTTPError: {}'.format(e))
             self.count_http_retry = 0
             return IngError.WXLoginHTTPError.value, str(e), ''
+        except Exception as e:
+            self.app.logger.error('WxMini.login.OtherException: {}'.format(e))
+            self.count_http_retry = 0
+            return IngError.WXLoginOtherError.value, str(e), ''
         else:
             self.count_http_retry = 0
             result = response.json()
@@ -119,6 +127,10 @@ class WxMini:
             self.app.logger.error('WxMini.get_ocr.HTTPError: {}'.format(e))
             self.count_http_retry = 0
             return IngError.WXOcrHTTPError.value, str(e), ''
+        except Exception as e:
+            self.app.logger.error('WxMini.get_ocr.OtherException: {}'.format(e))
+            self.count_http_retry = 0
+            return IngError.WXOcrOtherError.value, str(e), ''
         else:
             self.count_http_retry = 0
             result = response.json()

@@ -1,4 +1,3 @@
-
 import asyncio
 import openai
 from IngError import IngError
@@ -6,6 +5,7 @@ from IngError import IngError
 
 async def delayed_response(interval):
     await asyncio.sleep(interval)
+
 
 class OpenAI:
     api_key = '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'
@@ -72,6 +72,10 @@ class OpenAI:
                 return self.ask(ingredients)
             self.count_retry = 0
             return IngError.OpenAIServiceUnavailableError.value, 'openai.error.ServiceUnavailableError', ''
+        except Exception as e:
+            self.app.logger.error('OpenAI.ask.OtherException: {}'.format(e))
+            self.count_retry = 0
+            return IngError.OpenAIOtherError.value, str(e), ''
         else:
             result = ''
             for item in response:
