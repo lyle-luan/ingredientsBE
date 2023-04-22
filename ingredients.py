@@ -17,6 +17,7 @@ handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7, enc
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
 handler.setLevel(logging.DEBUG)
 app.logger.addHandler(handler)
+app.logger.setLevel(logging.DEBUG)
 
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
 wx = WxMini(app)
