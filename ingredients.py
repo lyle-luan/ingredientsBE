@@ -15,7 +15,7 @@ if not os.path.exists(log_dir):
 log_file = os.path.join(log_dir, 'app.log')
 handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7, encoding='utf-8')
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
-handler.setLevel(logging.INFO)
+handler.setLevel(logging.DEBUG)
 app.logger.addHandler(handler)
 
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
