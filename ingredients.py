@@ -31,7 +31,7 @@ def api_login():
         code = data.get('code')
         ing_key = data.get('key')
         app.logger.info('/api/login: code: {}, key: {}'.format(code, ing_key))
-        if code and ing_key:
+        if code:
             errcode, errmsg, result = wx.login(code, ing_key)
             if (errcode != 0) or (not result) or (len(result) <= 0):
                 app.logger.error(
