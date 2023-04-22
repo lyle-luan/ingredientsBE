@@ -91,22 +91,17 @@ class WxMini:
             self.count_http_retry = 0
             result = response.json()
             self.app.logger.info('WxMini.login.result: {}'.format(result))
-            if result['errcode'] != 0:
-                self.app.logger.error('WxMini.login.APIError: {}'.format(result))
-                return IngError.WXLoginAPIError.value, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'],
-                                                                                              result['errmsg']), ''
-
             user_openid = result['openid']
             user_session_key = result['session_key']
-            user_unionid = result['unionid']
+            user_expires_in = result['expires_in']
             # todo: 保存到数据库, js_code 是临时的
             # if NOT ing_key，数据库更新下数据，否则 insert
             self.app.logger.info(
-                'User: {} logined, openid: {}, session_key: {}, unionid: {}, last_ingKey: {}'.format(js_code,
-                                                                                                     user_openid,
-                                                                                                     user_session_key,
-                                                                                                     user_unionid,
-                                                                                                     ing_key))
+                'User: {} logined, openid: {}, session_key: {}, expires_in: {}, last_ingKey: {}'.format(js_code,
+                                                                                                        user_openid,
+                                                                                                        user_session_key,
+                                                                                                        user_expires_in,
+                                                                                                        ing_key))
             return 0, '', 'IUEIROJF&234234'  # ing_key
 
     def get_ocr(self, img_url):
