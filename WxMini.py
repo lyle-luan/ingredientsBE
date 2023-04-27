@@ -166,6 +166,9 @@ class WxMini:
 
         if not uid:
             return self.__wx_login(js_code, None)
+        else:
+            # todo: 小程序带 uid
+            pass
 
         cursor = self.mydb.cursor()
         query = "select * from user"
