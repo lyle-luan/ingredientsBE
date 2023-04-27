@@ -1,3 +1,5 @@
+import datetime
+
 import requests
 from requests import exceptions
 import time
@@ -20,8 +22,9 @@ class WxMini:
     max_retry_count = 2
     retry_interval_s = 0.3
 
-    def __init__(self, app):
+    def __init__(self, app, mydb):
         self.app = app
+        self.mydb = mydb
         self.access_token = ''
         self.access_token_expires_timestamp_s = time.time()
         self.count_http_retry = 0
@@ -62,8 +65,7 @@ class WxMini:
             self.access_token_expires_timestamp_s = now + result['expires_in']
             return 0, '', self.access_token
 
-    # ing_key: WX 文档里所说的"自定义用户态"
-    def login(self, js_code, ing_key):
+    def __wx_login(self, js_code, ing_key):
         try:
             self.app.logger.info('WxMini.login...: js_code: {}, ing_key: {}'.format(js_code, ing_key))
             login_url = WxMini.login_url.format(WxMini.app_id, WxMini.app_secret, js_code)
@@ -91,18 +93,59 @@ class WxMini:
             self.count_http_retry = 0
             result = response.json()
             self.app.logger.info('WxMini.login.result: {}'.format(result))
-            user_openid = result['openid']
-            user_session_key = result['session_key']
-            user_expires_in = result['expires_in']
-            # todo: 保存到数据库, js_code 是临时的
-            # if NOT ing_key，数据库更新下数据，否则 insert
+            wx_openid = result['openid']
+            wx_session_key = result['session_key']
+            wx_expires_in = result['expires_in']
             self.app.logger.info(
                 'User: {} logined, openid: {}, session_key: {}, expires_in: {}, last_ingKey: {}'.format(js_code,
-                                                                                                        user_openid,
-                                                                                                        user_session_key,
-                                                                                                        user_expires_in,
+                                                                                                        wx_openid,
+                                                                                                        wx_session_key,
+                                                                                                        wx_expires_in,
                                                                                                         ing_key))
-            return 0, '', 'IUEIROJF&234234'  # ing_key
+            wx_expires_timestamp = int(time.time()) + wx_expires_in
+            wx_expires_timestamp_str = datetime.datetime.fromtimestamp(wx_expires_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+            if not ing_key:
+                cursor = self.mydb.cursor()
+                query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s)"
+                self.app.logger.info(query)
+                cursor.execute(query, (wx_openid, wx_session_key, wx_expires_timestamp_str,))
+                self.mydb.commit()
+                cursor.close()
+                cursor = self.mydb.cursor()
+                query = "select uid from user where wx_open_id = \"{}\" and wx_session_key = \"{}\"".format(wx_openid, wx_session_key)
+                self.app.logger.info(query)
+                cursor.execute(query)
+                ing_key_all = cursor.fetchall()
+                cursor.close()
+                for row in ing_key_all:
+                    self.app.logger.info('select uid: {} from: {}'.format(row, query))
+                if len(ing_key_all) > 0:
+                    ing_key = ing_key_all[0]
+                    if len(ing_key_all) > 1:
+                        self.app.logger.warn('select uid: {} from : {}'.format(ing_key_all, query))
+                    return 0, '', ing_key
+                else:
+                    return IngError.DBInsertNewUserError.value, 'insert new user error', ''
+            else:
+                # todo: update openid, session_key
+                pass
+            return 0, '', ing_key
+
+    # ing_key: WX 文档里所说的"自定义用户态"
+    def login(self, js_code, ing_key):
+        if (not js_code) or (len(js_code) == 0):
+            return IngError.WXLoginRequestParameterError.value, 'no js_code', ''
+
+        if (not ing_key) or (len(ing_key) == 0):
+            return self.__wx_login(js_code, None)
+
+        cursor = self.mydb.cursor()
+        query = "select * from user"
+        cursor.execute(query)
+        results = cursor.fetchall()
+        for row in results:
+            self.app.logger.info('{}: {}'.format(query, row))
+        cursor.close()
 
     def get_ocr(self, img_url):
         self.app.logger.info('WxMini.get_ocr...')

@@ -5,8 +5,15 @@ from logging.handlers import TimedRotatingFileHandler
 from IngError import IngError
 from OpenAI import OpenAI
 from WxMini import WxMini
+import mysql.connector
 
 app = Flask(__name__)
+mydb = mysql.connector.connect(
+    host="localhost",
+    user="ingredient",
+    password="FaTqs-_7",
+    database="ingredients"
+)
 
 log_dir = os.path.join(app.root_path, 'logs')
 if not os.path.exists(log_dir):
@@ -20,7 +27,7 @@ app.logger.addHandler(handler)
 app.logger.setLevel(logging.DEBUG)
 
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
-wx = WxMini(app)
+wx = WxMini(app, mydb)
 gpt = OpenAI(app)
 
 
@@ -98,4 +105,4 @@ def upload():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run('127.0.0.1', '8888', debug=True)

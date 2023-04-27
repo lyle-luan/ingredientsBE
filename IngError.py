@@ -24,5 +24,6 @@ class IngError(Enum):
     WXLoginAPIError = 14
     WXLoginOtherError = 14
     WXLoginRequestParameterError = 15
+    DBInsertNewUserError = 16
     UploadOtherError = 100
     LoginOtherError = 200
