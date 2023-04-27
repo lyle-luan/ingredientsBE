@@ -21,7 +21,7 @@ if not os.path.exists(log_dir):
 
 log_file = os.path.join(log_dir, 'app.log')
 handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7, encoding='utf-8')
-handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(lineno)d: %(message)s'))
 handler.setLevel(logging.DEBUG)
 app.logger.addHandler(handler)
 app.logger.setLevel(logging.DEBUG)
@@ -37,21 +37,21 @@ def api_login():
     try:
         data = request.get_json()
         code = data.get('code')
-        ing_key = data.get('key')
-        app.logger.info('/api/login: code: {}, key: {}'.format(code, ing_key))
+        uid = data.get('key')
+        app.logger.info('/api/login: code: {}, key: {}'.format(code, uid))
         if code:
-            errcode, errmsg, result = wx.login(code, ing_key)
-            if (errcode != 0) or (not result) or (len(result) <= 0):
+            errcode, errmsg, result = wx.login(code, uid)
+            if (errcode != 0) or (not result):
                 app.logger.error(
                     '/api/login: 500, WxMini.login errcode: {}, errmsg: {}'.format(errcode, errmsg))
                 return jsonify({'errcode': errcode, 'errmsg': errmsg}), 500
 
-            app.logger.info('/api/login: 200, ing_key: {}'.format(result))
-            return jsonify({'errcode': 0, 'errmsg': 'success', 'ing_key': result})
+            app.logger.info('/api/login: 200, uid: {}'.format(result))
+            return jsonify({'errcode': 0, 'errmsg': 'success', 'uid': result})
 
-        app.logger.error('/api/login: code: {}, key: {}'.format(code, ing_key))
+        app.logger.error('/api/login: code: {}, key: {}'.format(code, uid))
         return jsonify({'errcode': IngError.WXLoginRequestParameterError.value,
-                        'errmsg': '/api/login: code: {}, key: {}'.format(code, ing_key)}), 500
+                        'errmsg': '/api/login: code: {}, key: {}'.format(code, uid)}), 500
     except Exception as e:
         app.logger.error('/api/login: 500, errors not caught: {}'.format(e))
         return jsonify({'errcode': IngError.LoginOtherError.value, 'errmsg': 'errors not caught'}), 500

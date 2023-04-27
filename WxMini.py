@@ -49,15 +49,15 @@ class WxMini:
                 return self.__get_token()
             else:
                 self.count_http_retry = 0
-                return IngError.WXTokenTimeout.value, str(e), ''
+                return IngError.WXTokenTimeout.value, str(e), None
         except exceptions.HTTPError as e:
             self.app.logger.error('WxMini.get_token.HTTPError: {}'.format(e))
             self.count_http_retry = 0
-            return IngError.WXTokenHTTPError.value, str(e), ''
+            return IngError.WXTokenHTTPError.value, str(e), None
         except Exception as e:
             self.app.logger.error('WxMini.get_token.OtherException: {}'.format(e))
             self.count_http_retry = 0
-            return IngError.WXTokenOtherError.value, str(e), ''
+            return IngError.WXTokenOtherError.value, str(e), None
         else:
             self.count_http_retry = 0
             result = response.json()
@@ -65,9 +65,34 @@ class WxMini:
             self.access_token_expires_timestamp_s = now + result['expires_in']
             return 0, '', self.access_token
 
-    def __wx_login(self, js_code, ing_key):
+    def __db_insert_create_user(self, wx_open_id, wx_session_key, wx_expires_timestamp_str):
+        cursor = self.mydb.cursor()
+        query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s)"
+        self.app.logger.info(query)
+        cursor.execute(query, (wx_open_id, wx_session_key, wx_expires_timestamp_str,))
+        self.mydb.commit()
+        cursor.close()
+        cursor = self.mydb.cursor()
+        query = "select uid from user where wx_open_id = \"{}\" and wx_session_key = \"{}\"".format(wx_open_id,
+                                                                                                    wx_session_key)
+        self.app.logger.info(query)
+        cursor.execute(query)
+        uid_all = cursor.fetchall()
+        self.app.logger.info('select result: {}'.format(uid_all))
+        cursor.close()
+        for row in uid_all:
+            self.app.logger.info('select uid: {} from: {}'.format(row, query))
+        if len(uid_all) > 0:
+            uid = uid_all[0]
+            if len(uid_all) > 1:
+                self.app.logger.warn('select uid: {} from : {}'.format(uid_all, query))
+            return uid[0]
+        else:
+            return None
+
+    def __wx_login(self, js_code, uid):
         try:
-            self.app.logger.info('WxMini.login...: js_code: {}, ing_key: {}'.format(js_code, ing_key))
+            self.app.logger.info('WxMini.login...: js_code: {}, uid: {}'.format(js_code, uid))
             login_url = WxMini.login_url.format(WxMini.app_id, WxMini.app_secret, js_code)
             self.app.logger.info('WxMini.login...: url: {}'.format(login_url))
             response = requests.get(login_url)
@@ -80,15 +105,15 @@ class WxMini:
                 return self.login(js_code)
             else:
                 self.count_http_retry = 0
-                return IngError.WXLoginTimeout.value, str(e), ''
+                return IngError.WXLoginTimeout.value, str(e), None
         except exceptions.HTTPError as e:
             self.app.logger.error('WxMini.login.HTTPError: {}'.format(e))
             self.count_http_retry = 0
-            return IngError.WXLoginHTTPError.value, str(e), ''
+            return IngError.WXLoginHTTPError.value, str(e), None
         except Exception as e:
             self.app.logger.error('WxMini.login.OtherException: {}'.format(e))
             self.count_http_retry = 0
-            return IngError.WXLoginOtherError.value, str(e), ''
+            return IngError.WXLoginOtherError.value, str(e), None
         else:
             self.count_http_retry = 0
             result = response.json()
@@ -101,42 +126,45 @@ class WxMini:
                                                                                                         wx_openid,
                                                                                                         wx_session_key,
                                                                                                         wx_expires_in,
-                                                                                                        ing_key))
+                                                                                                        uid))
             wx_expires_timestamp = int(time.time()) + wx_expires_in
-            wx_expires_timestamp_str = datetime.datetime.fromtimestamp(wx_expires_timestamp).strftime('%Y-%m-%d %H:%M:%S')
-            if not ing_key:
+            wx_expires_timestamp_str = datetime.datetime.fromtimestamp(wx_expires_timestamp).strftime(
+                '%Y-%m-%d %H:%M:%S')
+            if not uid:
+                uid_new = self.__db_insert_create_user(wx_openid, wx_session_key, wx_expires_timestamp_str)
+                self.app.logger.info("uid_new: {}".format(uid_new))
+                if not uid_new:
+                    return IngError.DBInsertNewUserError.value, 'insert new user error', None
+                else:
+                    return 0, '', uid_new
+            else:
                 cursor = self.mydb.cursor()
-                query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s)"
-                self.app.logger.info(query)
-                cursor.execute(query, (wx_openid, wx_session_key, wx_expires_timestamp_str,))
-                self.mydb.commit()
-                cursor.close()
-                cursor = self.mydb.cursor()
-                query = "select uid from user where wx_open_id = \"{}\" and wx_session_key = \"{}\"".format(wx_openid, wx_session_key)
+                query = "select uid from user where uid = \"{}\"".format(uid)
                 self.app.logger.info(query)
                 cursor.execute(query)
-                ing_key_all = cursor.fetchall()
+                uid_all = cursor.fetchall()
                 cursor.close()
-                for row in ing_key_all:
-                    self.app.logger.info('select uid: {} from: {}'.format(row, query))
-                if len(ing_key_all) > 0:
-                    ing_key = ing_key_all[0]
-                    if len(ing_key_all) > 1:
-                        self.app.logger.warn('select uid: {} from : {}'.format(ing_key_all, query))
-                    return 0, '', ing_key
+                if len(uid_all) > 0:
+                    cursor = self.mydb.cursor()
+                    query = "update user set wx_open_id=%s, wx_session_key=%s, wx_expires_timestamp=%s where uid=%s"
+                    self.app.logger.info(query)
+                    cursor.execute(query, (wx_openid, wx_session_key, wx_expires_timestamp_str, uid))
+                    self.mydb.commit()
+                    cursor.close()
+                    return 0, '', uid
                 else:
-                    return IngError.DBInsertNewUserError.value, 'insert new user error', ''
-            else:
-                # todo: update openid, session_key
-                pass
-            return 0, '', ing_key
+                    uid_new = self.__db_insert_create_user(wx_openid, wx_session_key, wx_expires_timestamp_str)
+                    if not uid_new:
+                        return IngError.DBInsertNewUserError.value, 'insert new user error', None
+                    else:
+                        return 0, '', uid_new
 
-    # ing_key: WX 文档里所说的"自定义用户态"
-    def login(self, js_code, ing_key):
+    # uid: WX 文档里所说的"自定义用户态"
+    def login(self, js_code, uid):
         if (not js_code) or (len(js_code) == 0):
-            return IngError.WXLoginRequestParameterError.value, 'no js_code', ''
+            return IngError.WXLoginRequestParameterError.value, 'no js_code', None
 
-        if (not ing_key) or (len(ing_key) == 0):
+        if not uid:
             return self.__wx_login(js_code, None)
 
         cursor = self.mydb.cursor()
@@ -162,22 +190,22 @@ class WxMini:
                 return self.get_ocr(img_url)
             else:
                 self.count_http_retry = 0
-                return IngError.WXOcrTimeout.value, str(e), ''
+                return IngError.WXOcrTimeout.value, str(e), None
         except exceptions.HTTPError as e:
             self.app.logger.error('WxMini.get_ocr.HTTPError: {}'.format(e))
             self.count_http_retry = 0
-            return IngError.WXOcrHTTPError.value, str(e), ''
+            return IngError.WXOcrHTTPError.value, str(e), None
         except Exception as e:
             self.app.logger.error('WxMini.get_ocr.OtherException: {}'.format(e))
             self.count_http_retry = 0
-            return IngError.WXOcrOtherError.value, str(e), ''
+            return IngError.WXOcrOtherError.value, str(e), None
         else:
             self.count_http_retry = 0
             result = response.json()
             if result['errcode'] != 0:
                 self.app.logger.error('WxMini.get_ocr.APIError: {}'.format(result))
                 return IngError.WXOcrAPIError.value, 'wx errcode: {}, wx errmsg: {}'.format(result['errcode'],
-                                                                                            result['errmsg']), ''
+                                                                                            result['errmsg']), None
 
             ocr_result = ''
             items = result['items']
