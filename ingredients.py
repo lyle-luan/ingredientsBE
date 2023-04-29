@@ -16,7 +16,7 @@ mydb = mysql.connector.connect(
     host="localhost",
     user="ingredient",
     password="FaTqs-_7",
-    database="ingredients"
+    database="ingredient"
 )
 
 log_dir = os.path.join(app.root_path, 'logs')
