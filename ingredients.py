@@ -7,17 +7,19 @@ from logging.handlers import TimedRotatingFileHandler
 from IngError import IngError
 from OpenAI import OpenAI
 from WxMini import WxMini
-import mysql.connector
+import mysql.connector.pooling
 import time
 import datetime
 
 app = Flask(__name__)
-mydb = mysql.connector.connect(
-    host="localhost",
-    user="ingredient",
-    password="FaTqs-_7",
-    database="ingredient"
-)
+db_config = {
+    "host": "localhost",
+    "user": "ingredient",
+    "password": "FaTqs-_7",
+    "database": "ingredient"
+}
+db_pool = mysql.connector.pooling.MySQLConnectionPool(pool_size=5, **db_config)
+mydb = db_pool.get_connection()
 
 log_dir = os.path.join(app.root_path, 'logs')
 if not os.path.exists(log_dir):
@@ -168,5 +170,5 @@ def api_usage():
 
 
 if __name__ == '__main__':
-    # app.run('127.0.0.1', '8888', debug=True)
-    app.run(debug=True)
+    app.run('127.0.0.1', '8888', debug=True)
+    # app.run(debug=True)
