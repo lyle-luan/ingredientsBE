@@ -168,12 +168,12 @@ class WxMini:
             return self.__wx_login(js_code, None)
         else:
             cursor = self.mydb.cursor()
-            query = "select * from user where uid=%s"
+            query = "select wx_expires_timestamp from user where uid=%s"
             cursor.execute(query, (uid,))
             results = cursor.fetchall()
             cursor.close()
             if len(results) > 0:
-                uid, wx_open_id, wx_session_key, wx_expires_timestamp, wx_unionid, usage_count, usage_limit = results[0]
+                wx_expires_timestamp, = results[0]
                 elapsed_time = int(wx_expires_timestamp.timestamp()) - int(time.time())
                 if elapsed_time <= 0:
                     self.app.logger.info('login uid: {}, timeout'.format(uid))

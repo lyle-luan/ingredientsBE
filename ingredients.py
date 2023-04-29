@@ -104,5 +104,40 @@ def upload():
         return jsonify({'errcode': IngError.UploadOtherError.value, 'errmsg': 'errors not caught'}), 500
 
 
+@app.route('/api/usage', methods=['POST'])
+def api_usage():
+    app.logger.info('/api/usage...')
+    try:
+        data = request.get_json()
+        uid = data.get('uid')
+        app.logger.info('/api/usage: uid: {}'.format(uid))
+        if not uid:
+            app.logger.error('/api/usage: uid: {}'.format(uid))
+            return jsonify({'errcode': IngError.UsageRequestParamError.value,
+                            'errmsg': '/api/usage: uid: {}'.format(uid)}), 500
+
+        cursor = mydb.cursor()
+        query = "select usage_count, usage_limit from user where uid=%s"
+        app.logger.info(query)
+        cursor.execute(query, (uid,))
+        results = cursor.fetchall()
+        app.logger.info('select result: {}'.format(results))
+        cursor.close()
+        if len(results) > 0:
+            usage, limit = results[0]
+            if usage < limit:
+                app.logger.info('/api/usage: 200, uid: {}'.format(uid))
+                return jsonify({'errcode': 0, 'errmsg': 'success', 'usage': 1})
+            else:
+                app.logger.error('/api/usage: 500, run out uid: {}'.format(uid))
+                return jsonify({'errcode': IngError.UsageRunOut.value, 'errmsg': 'run out'}), 500
+        else:
+            app.logger.error('/api/usage: 500, no uid: {}'.format(uid))
+            return jsonify({'errcode': IngError.UsageNoUsageFound.value, 'errmsg': 'no uid: {}'.format(uid)}), 500
+    except Exception as e:
+        app.logger.error('/api/usage: 500, errors not caught: {}'.format(e))
+        return jsonify({'errcode': IngError.UsageOtherError.value, 'errmsg': 'errors not caught'}), 500
+
+
 if __name__ == '__main__':
     app.run('127.0.0.1', '8888', debug=True)

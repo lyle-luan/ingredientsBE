@@ -4,6 +4,9 @@ from enum import Enum, unique
 class IngError(Enum):
     UploadNoImg = 1
     UploadImgNoName = 2
+    UsageRequestParamError = 3
+    UsageNoUsageFound = 4
+    UsageRunOut = 4
     OpenAIAPIError = 3
     OpenAITimeout = 4
     OpenAIRateLimitError = 5
@@ -27,3 +30,4 @@ class IngError(Enum):
     DBInsertNewUserError = 16
     UploadOtherError = 100
     LoginOtherError = 200
+    UsageOtherError = 200
