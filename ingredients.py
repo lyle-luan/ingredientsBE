@@ -103,7 +103,7 @@ def upload():
         ocr = ocr_result[2]
         if (ocr_result[0] != 0) or (not ocr) or (len(ocr) <= 0):
             app.logger.error(
-                '/upload: 500, WxMini.get_ocr errcode: {}, errmsg: {}'.format(ocr_result[0], ocr_result[1]))
+                '/upload: 500, WxMini.get_ocr err: {}'.format(ocr_result))
             return jsonify({'errcode': ocr_result[0], 'errmsg': ocr_result[1]}), 500
 
         gpt_result = gpt.ask(ocr)
