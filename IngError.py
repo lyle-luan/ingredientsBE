@@ -4,6 +4,7 @@ from enum import Enum, unique
 class IngError(Enum):
     UploadNoImg = 1
     UploadImgNoName = 2
+    UploadNoUid = 3
     UsageRequestParamError = 3
     UsageNoUsageFound = 4
     UsageRunOut = 4

@@ -1,3 +1,5 @@
+import json
+
 from flask import Flask, request, jsonify
 import os
 import logging
@@ -6,6 +8,8 @@ from IngError import IngError
 from OpenAI import OpenAI
 from WxMini import WxMini
 import mysql.connector
+import time
+import datetime
 
 app = Flask(__name__)
 mydb = mysql.connector.connect(
@@ -64,6 +68,15 @@ def upload():
     # todo: 历史记录，图片不删除，并制作 thumb; 历史记录暂时不做
     try:
         app.logger.info('/upload...')
+        data = request.form.get('data')
+        json_ata = json.loads(data)
+        uid = json_ata.get('uid')
+        app.logger.info('/upload: uid: {}'.format(uid))
+        if not uid:
+            app.logger.error('/upload: uid: {}'.format(uid))
+            return jsonify({'errcode': IngError.UploadNoUid.value,
+                            'errmsg': '/upload: uid: {}'.format(uid)}), 500
+
         if 'img' not in request.files:
             app.logger.error('/upload: 400, No img uploaded')
             return jsonify({'errcode': IngError.UploadNoImg.value, 'errmsg': 'No img uploaded'}), 400
@@ -98,6 +111,21 @@ def upload():
             return jsonify({'errcode': gpt_result[0], 'errmsg': gpt_result[1]}), 500
 
         app.logger.info('/upload: 200, conclusion: {}'.format(conclusion))
+        cursor = mydb.cursor()
+        query = "update user set usage_count=usage_count+1 where uid=%s"
+        app.logger.info(query)
+        cursor.execute(query, (uid,))
+        mydb.commit()
+        cursor.close()
+        cursor = mydb.cursor()
+        query = "insert into usage (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
+        app.logger.info(query)
+        now_timestamp = int(time.time())
+        now_timestamp_str = datetime.datetime.fromtimestamp(now_timestamp).strftime(
+            '%Y-%m-%d %H:%M:%S')
+        cursor.execute(query, (uid, file_path, ocr, conclusion, now_timestamp_str))
+        mydb.commit()
+        cursor.close()
         return jsonify({'errcode': 0, 'errmsg': 'success', 'ocr': conclusion})
     except Exception as e:
         app.logger.error('/upload: 500, errors not caught: {}'.format(e))
@@ -140,4 +168,5 @@ def api_usage():
 
 
 if __name__ == '__main__':
-    app.run('127.0.0.1', '8888', debug=True)
+    # app.run('127.0.0.1', '8888', debug=True)
+    app.run(debug=True)
