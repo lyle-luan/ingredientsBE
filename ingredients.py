@@ -98,7 +98,7 @@ def upload():
         img_url = 'https://newtype.top/images/' + file.filename
 
         ocr_result = wx.get_ocr(img_url)
-        os.remove(file_path)
+        # os.remove(file_path)
 
         ocr = ocr_result[2]
         if (ocr_result[0] != 0) or (not ocr) or (len(ocr) <= 0):

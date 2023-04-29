@@ -185,7 +185,7 @@ class WxMini:
                 return self.__wx_login(js_code, None)
 
     def get_ocr(self, img_url):
-        self.app.logger.info('WxMini.get_ocr...')
+        self.app.logger.info('WxMini.get_ocr...: {}'.format(img_url))
         self.__get_token()
         wx_url = WxMini.ocr_url.format(self.access_token, img_url)
         try:
