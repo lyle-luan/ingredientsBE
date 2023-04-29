@@ -169,9 +169,9 @@ def api_usage():
         return jsonify({'errcode': IngError.UsageOtherError.value, 'errmsg': 'errors not caught'}), 500
 
 
-@app.teardown_appcontext
-def close(error):
-    mydb.close()
+# @app.teardown_appcontext
+# def close(error):
+#     mydb.close()
 
 
 if __name__ == '__main__':
