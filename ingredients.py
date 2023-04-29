@@ -118,7 +118,7 @@ def upload():
         mydb.commit()
         cursor.close()
         cursor = mydb.cursor()
-        query = "insert into usage (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
+        query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
         app.logger.info(query)
         now_timestamp = int(time.time())
         now_timestamp_str = datetime.datetime.fromtimestamp(now_timestamp).strftime(
