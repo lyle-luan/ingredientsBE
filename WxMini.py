@@ -167,16 +167,22 @@ class WxMini:
         if not uid:
             return self.__wx_login(js_code, None)
         else:
-            # todo: 小程序带 uid
-            pass
-
-        cursor = self.mydb.cursor()
-        query = "select * from user"
-        cursor.execute(query)
-        results = cursor.fetchall()
-        for row in results:
-            self.app.logger.info('{}: {}'.format(query, row))
-        cursor.close()
+            cursor = self.mydb.cursor()
+            query = "select * from user where uid=%s"
+            cursor.execute(query, (uid,))
+            results = cursor.fetchall()
+            cursor.close()
+            if len(results) > 0:
+                uid, wx_open_id, wx_session_key, wx_expires_timestamp, wx_unionid, usage_count, usage_limit = results[0]
+                elapsed_time = int(wx_expires_timestamp.timestamp()) - int(time.time())
+                if elapsed_time <= 0:
+                    self.app.logger.info('login uid: {}, timeout'.format(uid))
+                    return self.__wx_login(js_code, uid)
+                else:
+                    self.app.logger.info('login uid: {}, not timeout'.format(uid))
+                    return 0, '', uid
+            else:
+                return self.__wx_login(js_code, None)
 
     def get_ocr(self, img_url):
         self.app.logger.info('WxMini.get_ocr...')
