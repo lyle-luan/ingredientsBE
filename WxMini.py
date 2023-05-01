@@ -63,6 +63,8 @@ class WxMini:
             result = response.json()
             self.access_token = result['access_token']
             self.access_token_expires_timestamp_s = now + result['expires_in']
+            self.log.info('WxMini.get_token result: access_token: {}, expires_at: {}'
+                          .format(self.access_token, self.access_token_expires_timestamp_s))
             return 0, '', self.access_token
 
     def __wx_login(self, js_code, uid):

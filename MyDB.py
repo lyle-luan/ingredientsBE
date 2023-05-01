@@ -31,8 +31,8 @@ class MyDB:
         query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
         self.log.info(query)
         cursor.execute(query, (uid, img_path, ocr, openai_answer, now_timestamp_str))
-        cursor.close()
         self.mydb.commit()
+        cursor.close()
 
     def usage_info_of_uid(self, uid):
         cursor = self.mydb.cursor()
@@ -57,8 +57,8 @@ class MyDB:
         cursor.execute(query)
         uid, = cursor.fetchone()
         self.log.info('return uid: {}'.format(uid))
-        cursor.close()
         self.mydb.commit()
+        cursor.close()
         return uid
 
     def update_or_create_user(self, uid, wx_open_id, wx_session_key, wx_expires_timestamp_str):
@@ -77,8 +77,8 @@ class MyDB:
         cursor.execute(query)
         uid_new, = cursor.fetchone()
         self.log.info('return uid: {}'.format(uid_new))
-        cursor.close()
         self.mydb.commit()
+        cursor.close()
         if uid_new == 0:
             return uid
         else:
