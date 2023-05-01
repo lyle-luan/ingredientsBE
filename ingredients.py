@@ -90,20 +90,18 @@ def upload():
         app.logger.info('/upload save file success.')
         img_url = 'https://newtype.top/images/' + file.filename
 
-        ocr_result = wx.get_ocr(img_url)
+        ocr_code, ocr_msg, ocr = wx.get_ocr(img_url)
         # os.remove(file_path)
 
-        ocr = ocr_result[2]
-        if (ocr_result[0] != 0) or (not ocr) or (len(ocr) <= 0):
+        if (ocr_code != 0) or (not ocr) or (len(ocr) <= 0):
             app.logger.error(
-                '/upload: 500, WxMini.get_ocr err: {}'.format(ocr_result))
-            return jsonify({'errcode': ocr_result[0], 'errmsg': ocr_result[1]}), 500
+                '/upload: 500, WxMini.get_ocr err: {}, {}'.format(ocr_code, ocr_msg))
+            return jsonify({'errcode': ocr_code, 'errmsg': ocr_msg}), 500
 
-        gpt_result = gpt.ask(ocr)
-        conclusion = gpt_result[2]
-        if (gpt_result[0] != 0) or (not conclusion) or (len(conclusion) <= 0):
-            app.logger.error('/upload: 500, OpenAI.ask errcode: {}, errmsg: {}'.format(gpt_result[0], gpt_result[1]))
-            return jsonify({'errcode': gpt_result[0], 'errmsg': gpt_result[1]}), 500
+        gpt_code, gpt_msg, conclusion = gpt.ask(ocr)
+        if (gpt_code != 0) or (not conclusion) or (len(conclusion) <= 0):
+            app.logger.error('/upload: 500, OpenAI.ask errcode: {}, errmsg: {}'.format(gpt_code, gpt_msg))
+            return jsonify({'errcode': gpt_code, 'errmsg': gpt_msg}), 500
 
         app.logger.info('/upload: 200, conclusion: {}'.format(conclusion))
         mydb.updateUsage(uid, file_path, ocr, conclusion)

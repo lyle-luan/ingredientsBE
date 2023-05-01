@@ -180,4 +180,8 @@ class WxMini:
             for item in items:
                 ocr_result += item['text'] + ' '
 
-            return 0, '', ocr_result
+            self.log.info('WxMini.get_ocr result: {}'.format(result))
+            if len(ocr_result) <= 0:
+                return IngError.WXOcrUnrecognizedError, 'unrecognized, check out the img.', None
+            else:
+                return 0, '', ocr_result

@@ -22,6 +22,7 @@ class IngError(Enum):
     WXOcrTimeout = 12
     WXOcrHTTPError = 13
     WXOcrAPIError = 14
+    WXOcrUnrecognizedError = 14
     WXOcrOtherError = 14
     WXLoginTimeout = 12
     WXLoginHTTPError = 13
