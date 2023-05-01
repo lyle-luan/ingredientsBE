@@ -104,7 +104,7 @@ def upload():
             return jsonify({'errcode': gpt_code, 'errmsg': gpt_msg}), 500
 
         app.logger.info('/upload: 200, conclusion: {}'.format(conclusion))
-        mydb.updateUsage(uid, file_path, ocr, conclusion)
+        mydb.update_usage(uid, file_path, ocr, conclusion)
         return jsonify({'errcode': 0, 'errmsg': 'success', 'ocr': conclusion})
     except Exception as e:
         app.logger.error('/upload: 500, errors not caught: {}'.format(e))
