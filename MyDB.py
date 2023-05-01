@@ -1,4 +1,5 @@
-import mysql.connector.pooling
+import mysql.connector
+from mysql.connector.errors import OperationalError
 import time
 import datetime
 
@@ -15,8 +16,12 @@ class MyDB:
             "password": "FaTqs-_7",
             "database": "ingredient"
         }
-        self.db_pool = mysql.connector.pooling.MySQLConnectionPool(pool_size=5, **db_config)
-        self.mydb = self.db_pool.get_connection()
+        try:
+            self.mydb = mysql.connector.connect(user='', password='', host='', database='')
+        except OperationalError as e:
+            log.error("MySql Connection error: {err}")
+            log.error("Attempting to reconnect...")
+            self.mydb.reconnect(attempts=3, delay=0.1)
         self.log = log
 
     def update_usage(self, uid, img_path, ocr, openai_answer):
