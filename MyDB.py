@@ -29,7 +29,7 @@ class MyDB:
             now_timestamp = int(time.time())
             now_timestamp_str = datetime.datetime.fromtimestamp(now_timestamp).strftime(
                 '%Y-%m-%d %H:%M:%S')
-            query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
+            query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s, %s)"
             self.log.info(query)
             cursor.execute(query, (uid, img_path, ocr, openai_answer, now_timestamp_str))
             mydb.commit()
