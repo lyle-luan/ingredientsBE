@@ -7,19 +7,11 @@ from logging.handlers import TimedRotatingFileHandler
 from IngError import IngError
 from OpenAI import OpenAI
 from WxMini import WxMini
-import mysql.connector.pooling
+from MyDB import MyDB
 import time
 import datetime
 
 app = Flask(__name__)
-db_config = {
-    "host": "localhost",
-    "user": "ingredient",
-    "password": "FaTqs-_7",
-    "database": "ingredient"
-}
-db_pool = mysql.connector.pooling.MySQLConnectionPool(pool_size=5, **db_config)
-mydb = db_pool.get_connection()
 
 log_dir = os.path.join(app.root_path, 'logs')
 if not os.path.exists(log_dir):
@@ -27,13 +19,14 @@ if not os.path.exists(log_dir):
 
 log_file = os.path.join(log_dir, 'app.log')
 handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7, encoding='utf-8')
-handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(lineno)d: %(message)s'))
+handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(lineno)d %(message)s'))
 handler.setLevel(logging.DEBUG)
 app.logger.addHandler(handler)
 app.logger.setLevel(logging.DEBUG)
 
 UPLOAD_FOLDER = '/var/www/newtype.top/images/'
-wx = WxMini(app, mydb)
+mydb = MyDB(app.logger)
+wx = WxMini(app.logger, mydb)
 gpt = OpenAI(app)
 
 
@@ -113,21 +106,7 @@ def upload():
             return jsonify({'errcode': gpt_result[0], 'errmsg': gpt_result[1]}), 500
 
         app.logger.info('/upload: 200, conclusion: {}'.format(conclusion))
-        cursor = mydb.cursor()
-        query = "update user set usage_count=usage_count+1 where uid=%s"
-        app.logger.info(query)
-        cursor.execute(query, (uid,))
-        mydb.commit()
-        cursor.close()
-        cursor = mydb.cursor()
-        query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
-        app.logger.info(query)
-        now_timestamp = int(time.time())
-        now_timestamp_str = datetime.datetime.fromtimestamp(now_timestamp).strftime(
-            '%Y-%m-%d %H:%M:%S')
-        cursor.execute(query, (uid, file_path, ocr, conclusion, now_timestamp_str))
-        mydb.commit()
-        cursor.close()
+        mydb.updateUsage(uid, file_path, ocr, conclusion)
         return jsonify({'errcode': 0, 'errmsg': 'success', 'ocr': conclusion})
     except Exception as e:
         app.logger.error('/upload: 500, errors not caught: {}'.format(e))
@@ -146,24 +125,18 @@ def api_usage():
             return jsonify({'errcode': IngError.UsageRequestParamError.value,
                             'errmsg': '/api/usage: uid: {}'.format(uid)}), 500
 
-        cursor = mydb.cursor()
-        query = "select usage_count, usage_limit from user where uid=%s"
-        app.logger.info(query)
-        cursor.execute(query, (uid,))
-        results = cursor.fetchall()
-        app.logger.info('select result: {}'.format(results))
-        cursor.close()
-        if len(results) > 0:
-            usage, limit = results[0]
+        usage, limit = mydb.usage_info_of_uid(uid)
+        if usage < 0 or limit < 0:
+            app.logger.error('/api/usage: 500, no uid: {}'.format(uid))
+            return jsonify({'errcode': IngError.UsageNoUsageFound.value, 'errmsg': 'no uid: {}'.format(uid)}), 500
+        else:
             if usage < limit:
                 app.logger.info('/api/usage: 200, uid: {}'.format(uid))
                 return jsonify({'errcode': 0, 'errmsg': 'success', 'usage': 1})
             else:
                 app.logger.error('/api/usage: 500, run out uid: {}'.format(uid))
                 return jsonify({'errcode': IngError.UsageRunOut.value, 'errmsg': 'run out'}), 500
-        else:
-            app.logger.error('/api/usage: 500, no uid: {}'.format(uid))
-            return jsonify({'errcode': IngError.UsageNoUsageFound.value, 'errmsg': 'no uid: {}'.format(uid)}), 500
+
     except Exception as e:
         app.logger.error('/api/usage: 500, errors not caught: {}'.format(e))
         return jsonify({'errcode': IngError.UsageOtherError.value, 'errmsg': 'errors not caught'}), 500
