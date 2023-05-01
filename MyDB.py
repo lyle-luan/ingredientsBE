@@ -24,12 +24,10 @@ class MyDB:
         query = "update user set usage_count=usage_count+1 where uid=%s"
         self.log.info(query)
         cursor.execute(query, (uid,))
-        cursor.close()
 
         now_timestamp = int(time.time())
         now_timestamp_str = datetime.datetime.fromtimestamp(now_timestamp).strftime(
             '%Y-%m-%d %H:%M:%S')
-        cursor = self.mydb.cursor()
         query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s)"
         self.log.info(query)
         cursor.execute(query, (uid, img_path, ocr, openai_answer, now_timestamp_str))
@@ -88,9 +86,12 @@ class MyDB:
 
     def wx_expires_timestamp_of_user(self, uid):
         cursor = self.mydb.cursor()
-        query = "select wx_expires_timestamp from user where uid=%s"
+        query = "select wx_expires_timestamp from user where uid = %s"
+        self.log.info(query)
         cursor.execute(query, (uid,))
-        wx_expires_timestamp, = cursor.fetchone()
+        result = cursor.fetchone()
+        if not result:
+            wx_expires_timestamp = result[0]
         self.log.info('return wx_expires_timestamp: {}'.format(wx_expires_timestamp))
         cursor.close()
         return wx_expires_timestamp
