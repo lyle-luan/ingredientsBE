@@ -8,7 +8,7 @@ async def delayed_response(interval):
 
 
 class OpenAI:
-    api_key = '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'
+    api_key = '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'
     prompt = '提取下面文字中的食品配料表，并分析每种配料对人体是否健康，并给出食用建议，少于 100 个字: {}'
     max_retry_count = 2
     retry_interval_s = 0.3
