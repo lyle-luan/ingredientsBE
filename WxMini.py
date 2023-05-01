@@ -113,7 +113,7 @@ class WxMini:
                 else:
                     return 0, '', uid_new
             else:
-                uid_new = self.mydb.update_or_create_user(wx_openid, wx_session_key, wx_expires_timestamp_str)
+                uid_new = self.mydb.update_or_create_user(uid, wx_openid, wx_session_key, wx_expires_timestamp_str)
                 self.log.info("uid_new: {}".format(uid_new))
                 if not uid_new:
                     return IngError.DBInsertNewUserError.value, 'insert new user error', None

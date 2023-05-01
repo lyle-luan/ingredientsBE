@@ -51,10 +51,12 @@ class MyDB:
 
     def create_user(self, wx_open_id, wx_session_key, wx_expires_timestamp_str):
         cursor = self.mydb.cursor()
-        query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s) " \
-                "RETURNING uid;"
+        query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s)"
         self.log.info(query)
         cursor.execute(query, (wx_open_id, wx_session_key, wx_expires_timestamp_str))
+        query = "select last_insert_id()"
+        self.log.info(query)
+        cursor.execute(query)
         uid, = cursor.fetchone()
         self.log.info('return uid: {}'.format(uid))
         cursor.close()
@@ -63,19 +65,26 @@ class MyDB:
 
     def update_or_create_user(self, uid, wx_open_id, wx_session_key, wx_expires_timestamp_str):
         cursor = self.mydb.cursor()
-        query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s) " \
+        query = "insert into user (uid, wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s, %s) " \
                 "ON DUPLICATE KEY UPDATE " \
-                "wx_open_id = values(wx_open_id)," \
-                "wx_session_key = values(wx_session_key)," \
-                "wx_expires_timestamp = values(wx_expires_timestamp) " \
-                "RETURNING uid;"
+                "uid = values(uid), " \
+                "wx_open_id = values(wx_open_id), " \
+                "wx_session_key = values(wx_session_key), " \
+                "wx_expires_timestamp = values(wx_expires_timestamp);"
         self.log.info(query)
-        cursor.execute(query, (wx_open_id, wx_session_key, wx_expires_timestamp_str))
-        uid, = cursor.fetchone()
-        self.log.info('return uid: {}'.format(uid))
+        self.log.info('uid: {}, open_Id: {}, session_key: {}, timestamp: {}'.format(uid, wx_open_id, wx_session_key, wx_expires_timestamp_str))
+        cursor.execute(query, (uid, wx_open_id, wx_session_key, wx_expires_timestamp_str))
+        query = " SELECT LAST_INSERT_ID() AS uid;"
+        self.log.info(query)
+        cursor.execute(query)
+        uid_new, = cursor.fetchone()
+        self.log.info('return uid: {}'.format(uid_new))
         cursor.close()
         self.mydb.commit()
-        return uid
+        if uid_new == 0:
+            return uid
+        else:
+            return uid_new
 
     def wx_expires_timestamp_of_user(self, uid):
         cursor = self.mydb.cursor()
