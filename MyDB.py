@@ -10,14 +10,11 @@ class MyDB:
     retry_interval_s = 0.3
 
     def __init__(self, log):
-        db_config = {
-            "host": "localhost",
-            "user": "ingredient",
-            "password": "FaTqs-_7",
-            "database": "ingredient"
-        }
         try:
-            self.mydb = mysql.connector.connect(user='', password='', host='', database='')
+            self.mydb = mysql.connector.connect(user='ingredient',
+                                                password='FaTqs-_7',
+                                                host='localhost',
+                                                database='ingredient')
         except OperationalError as e:
             log.error("MySql Connection error: {err}")
             log.error("Attempting to reconnect...")
