@@ -20,6 +20,15 @@ class MyDB:
         self.log = log
 
     def update_usage(self, uid, img_path, ocr, openai_answer):
+        def truncate_string(original_str, length):
+            original_bytes = original_str.encode('utf-8')
+            if len(original_bytes) <= length:
+                return original_str
+            else:
+                truncated_bytes = original_bytes[:length]
+                truncated_string = truncated_bytes.decode('utf-8', 'ignore')
+                return truncated_string
+
         with self.db_pool.get_connection() as mydb:
             cursor = mydb.cursor()
             query = "update user set usage_count=usage_count+1 where uid=%s"
@@ -31,7 +40,10 @@ class MyDB:
                 '%Y-%m-%d %H:%M:%S')
             query = "insert into `usage` (uid, img_path, ocr, openai_answer, timestamp) values (%s, %s, %s, %s, %s)"
             self.log.info(query)
-            cursor.execute(query, (uid, img_path, ocr, openai_answer, now_timestamp_str))
+            cursor.execute(query, (uid, img_path[:255],
+                                   truncate_string(ocr, 1000),
+                                   truncate_string(openai_answer, 1000),
+                                   now_timestamp_str))
             mydb.commit()
 
     def usage_info_of_uid(self, uid):
@@ -52,7 +64,7 @@ class MyDB:
             cursor = mydb.cursor()
             query = "insert into user (wx_open_id, wx_session_key, wx_expires_timestamp) values (%s, %s, %s)"
             self.log.info(query)
-            cursor.execute(query, (wx_open_id, wx_session_key, wx_expires_timestamp_str))
+            cursor.execute(query, (wx_open_id[:255], wx_session_key[:255], wx_expires_timestamp_str))
             query = "select last_insert_id()"
             self.log.info(query)
             cursor.execute(query)
@@ -73,7 +85,7 @@ class MyDB:
             self.log.info(query)
             self.log.info('uid: {}, open_Id: {}, session_key: {}, timestamp: {}'.format(uid, wx_open_id, wx_session_key,
                                                                                         wx_expires_timestamp_str))
-            cursor.execute(query, (uid, wx_open_id, wx_session_key, wx_expires_timestamp_str))
+            cursor.execute(query, (uid, wx_open_id[:255], wx_session_key[:255], wx_expires_timestamp_str))
             query = " SELECT LAST_INSERT_ID() AS uid;"
             self.log.info(query)
             cursor.execute(query)
