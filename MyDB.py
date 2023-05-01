@@ -90,7 +90,7 @@ class MyDB:
         self.log.info(query)
         cursor.execute(query, (uid,))
         result = cursor.fetchone()
-        if not result:
+        if result and len(result) > 0:
             wx_expires_timestamp = result[0]
         self.log.info('return wx_expires_timestamp: {}'.format(wx_expires_timestamp))
         cursor.close()
