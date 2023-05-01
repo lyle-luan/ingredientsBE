@@ -182,6 +182,6 @@ class WxMini:
 
             self.log.info('WxMini.get_ocr result: {}'.format(result))
             if len(ocr_result) <= 0:
-                return IngError.WXOcrUnrecognizedError, 'unrecognized, check out the img.', None
+                return IngError.WXOcrUnrecognizedError.value, 'unrecognized, check out the img.', None
             else:
                 return 0, '', ocr_result
