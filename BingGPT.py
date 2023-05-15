@@ -8,14 +8,27 @@ class BingGPT:
     retry_interval_s = 0.3
 
     def __init__(self, app):
+        self.bot = None
         self.count_retry = 0
         self.app = app
-        self.bot = Chatbot.create(cookie_path='./cookies.json')
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.create_bing())
+        loop.close()
+
+    async def create_bing(self):
+        self.bot = await Chatbot.create(cookie_path='./cookies.json')
 
     def ask(self, ingredients: str):
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(self.ask(ingredients))
+        loop.run_until_complete(task)
+        loop.close()
+        return task.result()
+
+    async def ask(self, ingredients: str):
         try:
             self.app.logger.info('BingGPT.ask...: {}'.format(ingredients))
-            response = self.bot.ask(
+            response = await self.bot.ask(
                 prompt="提取下面文字中的食品配料表，并分析每种配料对人体是否健康，并给出食用建议，少于 100 个字:{}".format(
                     ingredients),
                 conversation_style=ConversationStyle.creative)
