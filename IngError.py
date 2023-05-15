@@ -30,6 +30,7 @@ class IngError(Enum):
     WXLoginRequestParameterError = 15
     DBInsertNewUserError = 16
     BingAskResultError = 17
+    BingAwaitError = 18
     UploadOtherError = 100
     LoginOtherError = 200
     UsageOtherError = 300

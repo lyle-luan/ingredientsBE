@@ -23,7 +23,13 @@ class BingGPT:
         task = loop.create_task(self.ask(ingredients))
         loop.run_until_complete(task)
         loop.close()
-        return task.result()
+        try:
+            result = task.result()
+        except Exception as e:
+            self.app.logger.error('BingGPT.ask.await: {}'.format(e))
+            return IngError.BingAwaitError.value, str(e), ''
+        else:
+            return result
 
     async def ask(self, ingredients: str):
         try:
