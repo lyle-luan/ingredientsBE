@@ -8,8 +8,7 @@ from IngError import IngError
 from OpenAI import OpenAI
 from WxMini import WxMini
 from MyDB import MyDB
-import time
-import datetime
+from BingGPT import BingGPT
 
 app = Flask(__name__)
 
@@ -28,6 +27,7 @@ UPLOAD_FOLDER = '/var/www/newtype.top/images/'
 mydb = MyDB(app.logger)
 wx = WxMini(app.logger, mydb)
 gpt = OpenAI(app)
+bing = BingGPT(app)
 
 
 @app.route('/api/login', methods=['POST'])
@@ -98,7 +98,8 @@ def upload():
                 '/upload: 500, WxMini.get_ocr err: {}, {}'.format(ocr_code, ocr_msg))
             return jsonify({'errcode': ocr_code, 'errmsg': ocr_msg}), 500
 
-        gpt_code, gpt_msg, conclusion = gpt.ask(ocr)
+        # gpt_code, gpt_msg, conclusion = gpt.ask(ocr)
+        gpt_code, gpt_msg, conclusion = bing.ask(ocr)
         if (gpt_code != 0) or (not conclusion) or (len(conclusion) <= 0):
             app.logger.error('/upload: 500, OpenAI.ask errcode: {}, errmsg: {}'.format(gpt_code, gpt_msg))
             return jsonify({'errcode': gpt_code, 'errmsg': gpt_msg}), 500
@@ -146,5 +147,5 @@ def api_usage():
 
 
 if __name__ == '__main__':
-    # app.run('127.0.0.1', '8888', debug=True)
-    app.run(debug=True)
+    app.run('127.0.0.1', '8888', debug=True)
+    # app.run(debug=True)

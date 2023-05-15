@@ -15,7 +15,6 @@ class IngError(Enum):
     OpenAIInvalidRequestError = 7
     OpenAIAuthenticationError = 8
     OpenAIServiceUnavailableError = 9
-    OpenAIOtherError = 9
     WXTokenTimeout = 10
     WXTokenHTTPError = 11
     WXTokenOtherError = 11
@@ -30,6 +29,9 @@ class IngError(Enum):
     WXLoginOtherError = 14
     WXLoginRequestParameterError = 15
     DBInsertNewUserError = 16
+    BingAskResultError = 17
     UploadOtherError = 100
     LoginOtherError = 200
-    UsageOtherError = 200
+    UsageOtherError = 300
+    OpenAIOtherError = 400
+    BingOtherError = 500
